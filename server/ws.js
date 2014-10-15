@@ -71,11 +71,11 @@ wss.on('request', function(request) {
     			msg = ensureMessage(message);
 
     		} catch (err) {
-    			ws.send(err);
+    			ws.sendUTF(err);
     		}
         	var type = msg.type;
         	if (type == null) {
-        		ws.send("{'error':true,'description':'No message type specified'}");
+        		ws.sendUTF("{'error':true,'description':'No message type specified'}");
         		return;
         	}
 
