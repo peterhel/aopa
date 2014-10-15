@@ -1,0 +1,23 @@
+define ClientMessage {
+    accountid : '',
+    game: '',
+    monkey:'apa',
+    constructor : function(data){
+        console.log("Creating object");
+        this.accountid = data.accountid;
+        this.game = data.game;
+        console.log("Account: " + this.accountid);
+        console.log("Game: " + this.game);
+
+    }
+}
+
+//find any message that starts with hello
+rule AccountMatch {
+    when {
+        m : ClientMessage m.accountid > 0;
+    }
+    then {
+        modify(m, function(){m.monkey = "gris";});
+    }
+}

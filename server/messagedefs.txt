@@ -1,0 +1,26 @@
+MARTIN CAN SEND:
+
+{
+	type:'listen',
+	accountid:'<theid>',
+}
+
+// WILL RECEIVE OK OR ERROR CODES
+
+{
+	type:'claim',
+	claim:true|false,
+	uid:'<thebonusuid>'
+}
+
+// WILL RECEIVE OK OR ERROR CODES
+
+MARTIN CAN RECEIVE
+{
+	bonusname:'<the name>',
+	bonustype:'handout|freerounds',
+	bonusid:'uid',
+
+}
+
+REQUIRES RESPONSE
