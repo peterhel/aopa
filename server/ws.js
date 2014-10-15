@@ -1,3 +1,9 @@
+var EQ = require('./events.js').Events;
+var ActiveClients = require('./rules.js').actives;
+var EventGenerator = require('./rules.js').EventGenerator;
+var Rules = require('./rules.js').Rules;
+
+
 var WebSocketServer = require('ws').Server
   , wss = new WebSocketServer({port: 5000});
 
@@ -20,23 +26,51 @@ var errorHandler = function (err) {
 	}
 };
 
+var ensureMessage = function(message) {
+	if (typeof message === "string") {
+		try {
+			return JSON.parse(message);
+		} catch (err) {
+			throw "{'error':true,'description':'Malformed JSON'}"
+		}
+	} else if (typeof message === "object") {
+		return message;
+	}
+	throw "{'error':true,'description':'Neither string nor object'}"
+
+}
+
 wss.on('connection', function(ws) {
     	console.log("Connection achieved")
 
     	ws.on('message', function(message) {
-        	console.log('received: %s', message);
-        	var object = JSON.parse(message);
-        	if (games[object.game]!=null && playerMap[object.AccountId]== null) {
-        		object.ws = ws;
-        		currentPlayers[games[object.game]].push(object);
-        		object.wagered = 0;
-        		object.result = 0;
-        		playerMap[object.AccountId] = object;
+    		console.log("Incoming message");
+    		var msg = null;
+    		try {
+    			msg = ensureMessage(message);
 
-        		ws.send("OK");
-        	} else {
-        		ws.send("INACTIVE");
+    		} catch (err) {
+    			ws.send(err);
+    		}
+        	var type = msg.type;
+        	if (type == null) {
+        		ws.send("{'error':true,'description':'No message type specified'}");
+        		return;
         	}
+
+        	if (type == 'listen' || type == 'claim') {
+        		msg.socket = ws;
+				Rules.assert(EventGenerator(msg));
+				Rules.match(function(err){
+					console.log("Match result?");
+					if(err){
+					    console.error(err.stack);
+					}else{
+					    console.log("done");
+					}
+				});
+
+	        } 
     	});
 		ws.on('close', function(msg) {
 			console.log("BYE");
@@ -45,54 +79,15 @@ wss.on('connection', function(ws) {
 });
 
 
-var amqp = require('amqp');
 
-var connection = amqp.createConnection({ host: 'mq.mrgreen.zone' });
+var events = new EQ('mq.mrgreen.zone','mrg-domain', function(message) {
+	console.log(message.data.toString());
+	var msg = EventGenerator(JSON.parse(message.data.toString()));
+	Rules.assert(msg);
+	Rules.match(function(err){
+		if(err){
+		    console.error("Match error: " + err.stack);
+		}
+	});
+})
 
-// Wait for connection to become established.
-connection.on('ready', function () {
-  // Use the default 'amq.topic' exchange
-  connection.queue('', function (q) {
-      // Catch all messages
-      q.bind('mrg-domain','#');
-
-      // Receive messages
-      q.subscribe(function (message) {
-        // Print messages to stdout
-        var str = message.data.toString();
-        var msg = JSON.parse(str);
-        if (msg._type == "ROUND") {
-	        var gameId = msg.event.catThree;
-	        var AccountId = msg.event.player.accountid;
-	        var wager = msg.event.betAmount;
-	        var won = msg.event.winAmount;
-	        var result = won-wager;
-	        playerMap[AccountId].wagered+=wager;
-	        playerMap[AccountId].result+=result;
-
-	        switch (msg.event.player.currency) {
-	        	case "SEK":
-	        		console.log("IS SEK");
-	        		if (playerMap[AccountId].wagered >= 10) {
-	        			console.log("*************** WINNER ***********");
-	        			playerMap[AccountId].ws.send("{BonusAvailable:true, BonusName:'BloodMoney', Amount:100, Currency:" + msg.event.player.currency + "}");
-	        			playerMap[AccountId].bonusAvailable= true;
-	        			playerMap[AccountId].bonusAmount = 100;
-	        			playerMap[AccountId].wagered -=10;
-	        		}
-	        		break;
-	        	case "EUR":
-	        		console.log("IS EUR");
-	        		break;
-	        }
-	    } else if (msg._type == "LOGOUT") {
-	    	console.log("LOGOUT::" + str);
-	    	console.log("Player " + msg.event.player.accountid + " just logged out");
-	    	playerMap[AccountId] = null;
-	    } else if (msg._type == "LOGIN") {
-	    	console.log("Player " + msg.event.player.accountid + " just logged in");
-	    } 
-        //console.log(message.data.toString());
-      });
-  });
-});
