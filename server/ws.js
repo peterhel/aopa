@@ -63,7 +63,9 @@ wss.on('request', function(request) {
     	console.log("Connection achieved")
 
 	    var ws = request.accept(null, request.origin);
-
+	    ws.send = function(msg){
+	    	this.sendUTF(msg);
+	    }
     	ws.on('message', function(message) {
     		console.log("Incoming message");
     		var msg = null;
@@ -71,11 +73,11 @@ wss.on('request', function(request) {
     			msg = ensureMessage(message);
 
     		} catch (err) {
-    			ws.sendUTF(err);
+    			ws.send(err);
     		}
         	var type = msg.type;
         	if (type == null) {
-        		ws.sendUTF("{'error':true,'description':'No message type specified'}");
+        		ws.send("{'error':true,'description':'No message type specified'}");
         		return;
         	}
 
